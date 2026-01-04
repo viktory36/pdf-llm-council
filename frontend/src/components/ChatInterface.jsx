@@ -19,13 +19,17 @@ export default function ChatInterface({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const canSubmit = () => {
+    return (input.trim() || selectedFile) && !isLoading;
+  };
+
   useEffect(() => {
     scrollToBottom();
   }, [conversation]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if ((input.trim() || selectedFile) && !isLoading) {
+    if (canSubmit()) {
       onSendMessage(input, selectedFile);
       setInput('');
       setSelectedFile(null);
@@ -39,8 +43,10 @@ export default function ChatInterface({
     const file = e.target.files?.[0];
     if (file) {
       if (!file.name.toLowerCase().endsWith('.pdf')) {
-        alert('Please select a PDF file');
+        // Reset file input
         e.target.value = '';
+        // Could be replaced with a toast notification system in the future
+        alert('Please select a PDF file');
         return;
       }
       setSelectedFile(file);
@@ -188,7 +194,7 @@ export default function ChatInterface({
               <button
                 type="submit"
                 className="send-button"
-                disabled={(!input.trim() && !selectedFile) || isLoading}
+                disabled={!canSubmit()}
               >
                 Send
               </button>

@@ -30,11 +30,6 @@ class CreateConversationRequest(BaseModel):
     pass
 
 
-class SendMessageRequest(BaseModel):
-    """Request to send a message in a conversation."""
-    content: str
-
-
 class ConversationMetadata(BaseModel):
     """Conversation metadata for list view."""
     id: str
@@ -103,7 +98,7 @@ async def send_message(
     messages = []
     if file is not None:
         # Validate file type
-        if not file.filename.lower().endswith('.pdf'):
+        if not file.filename or not file.filename.lower().endswith('.pdf'):
             raise HTTPException(status_code=400, detail="Only PDF files are supported")
         
         try:
@@ -173,7 +168,7 @@ async def send_message_stream(
     pdf_filename = None
     if file is not None:
         # Validate file type
-        if not file.filename.lower().endswith('.pdf'):
+        if not file.filename or not file.filename.lower().endswith('.pdf'):
             raise HTTPException(status_code=400, detail="Only PDF files are supported")
         
         pdf_filename = file.filename
