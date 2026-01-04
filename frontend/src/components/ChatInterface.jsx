@@ -11,10 +11,16 @@ export default function ChatInterface({
   isLoading,
 }) {
   const [input, setInput] = useState('');
+  const [selectedFile, setSelectedFile] = useState(null);
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const canSubmit = () => {
+    return (input.trim() || selectedFile) && !isLoading;
   };
 
   useEffect(() => {
@@ -23,9 +29,34 @@ export default function ChatInterface({
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (input.trim() && !isLoading) {
-      onSendMessage(input);
+    if (canSubmit()) {
+      onSendMessage(input, selectedFile);
       setInput('');
+      setSelectedFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.name.toLowerCase().endsWith('.pdf')) {
+        // Reset file input
+        e.target.value = '';
+        // Could be replaced with a toast notification system in the future
+        alert('Please select a PDF file');
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
+
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -122,22 +153,53 @@ export default function ChatInterface({
 
       {conversation.messages.length === 0 && (
         <form className="input-form" onSubmit={handleSubmit}>
-          <textarea
-            className="message-input"
-            placeholder="Ask your question... (Shift+Enter for new line, Enter to send)"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={isLoading}
-            rows={3}
-          />
-          <button
-            type="submit"
-            className="send-button"
-            disabled={!input.trim() || isLoading}
-          >
-            Send
-          </button>
+          <div className="input-wrapper">
+            <textarea
+              className="message-input"
+              placeholder="Ask your question... (Shift+Enter for new line, Enter to send)"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={isLoading}
+              rows={3}
+            />
+            <div className="input-controls">
+              <div className="file-upload-section">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf"
+                  onChange={handleFileChange}
+                  disabled={isLoading}
+                  style={{ display: 'none' }}
+                  id="pdf-upload"
+                />
+                <label htmlFor="pdf-upload" className="file-upload-button">
+                  📎 Attach PDF
+                </label>
+                {selectedFile && (
+                  <div className="selected-file">
+                    <span className="file-name">{selectedFile.name}</span>
+                    <button
+                      type="button"
+                      onClick={handleRemoveFile}
+                      className="remove-file-button"
+                      disabled={isLoading}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+              </div>
+              <button
+                type="submit"
+                className="send-button"
+                disabled={!canSubmit()}
+              >
+                Send
+              </button>
+            </div>
+          </div>
         </form>
       )}
     </div>

@@ -4,9 +4,11 @@
 
 The idea of this repo is that instead of asking a question to your favorite LLM provider (e.g. OpenAI GPT 5.1, Google Gemini 3.0 Pro, Anthropic Claude Sonnet 4.5, xAI Grok 4, eg.c), you can group them into your "LLM Council". This repo is a simple, local web app that essentially looks like ChatGPT except it uses OpenRouter to send your query to multiple LLMs, it then asks them to review and rank each other's work, and finally a Chairman LLM produces the final response.
 
+**New: PDF Support!** You can now attach PDF files to your queries, and the council will analyze them using OpenRouter's native multimodal PDF support.
+
 In a bit more detail, here is what happens when you submit a query:
 
-1. **Stage 1: First opinions**. The user query is given to all LLMs individually, and the responses are collected. The individual responses are shown in a "tab view", so that the user can inspect them all one by one.
+1. **Stage 1: First opinions**. The user query (with optional PDF attachment) is given to all LLMs individually, and the responses are collected. The individual responses are shown in a "tab view", so that the user can inspect them all one by one.
 2. **Stage 2: Review**. Each individual LLM is given the responses of the other LLMs. Under the hood, the LLM identities are anonymized so that the LLM can't play favorites when judging their outputs. The LLM is asked to rank them in accuracy and insight.
 3. **Stage 3: Final response**. The designated Chairman of the LLM Council takes all of the model's responses and compiles them into a single final answer that is presented to the user.
 
@@ -79,9 +81,25 @@ npm run dev
 
 Then open http://localhost:5173 in your browser.
 
+## Using PDF Support
+
+The LLM Council now supports PDF file uploads using OpenRouter's native multimodal capabilities:
+
+1. **Attach a PDF**: Click the "📎 Attach PDF" button in the message input area
+2. **Select your PDF**: Choose any PDF file from your computer
+3. **Add your question**: Type your question or instructions about the PDF (or leave blank for general analysis)
+4. **Send**: The entire council will analyze the PDF and provide their responses
+
+The PDFs are sent directly to the LLM models using OpenRouter's multimodal support, which means:
+- Models can see the actual PDF structure, formatting, and layout
+- Charts, tables, and images in PDFs are preserved
+- Better understanding of document context compared to plain text extraction
+
+**Note**: Make sure the models you've configured in `backend/config.py` support PDF analysis. Most modern multimodal models (GPT-4, Claude, Gemini) support this feature.
+
 ## Tech Stack
 
-- **Backend:** FastAPI (Python 3.10+), async httpx, OpenRouter API
+- **Backend:** FastAPI (Python 3.10+), async httpx, OpenRouter API with multimodal PDF support
 - **Frontend:** React + Vite, react-markdown for rendering
 - **Storage:** JSON files in `data/conversations/`
 - **Package Management:** uv for Python, npm for JavaScript

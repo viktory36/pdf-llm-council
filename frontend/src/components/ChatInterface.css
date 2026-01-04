@@ -101,12 +101,15 @@
 }
 
 .input-form {
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
   padding: 24px;
   border-top: 1px solid #e0e0e0;
   background: #fafafa;
+}
+
+.input-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .message-input {
@@ -134,6 +137,78 @@
   opacity: 0.5;
   cursor: not-allowed;
   background: #f5f5f5;
+}
+
+.input-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.file-upload-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.file-upload-button {
+  padding: 10px 16px;
+  background: #ffffff;
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  color: #333;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.file-upload-button:hover {
+  background: #f5f5f5;
+  border-color: #4a90e2;
+}
+
+.selected-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #e8f4fd;
+  border: 1px solid #b3d9f7;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #333;
+}
+
+.file-name {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.remove-file-button {
+  padding: 2px 6px;
+  background: transparent;
+  border: none;
+  color: #666;
+  font-size: 16px;
+  cursor: pointer;
+  transition: color 0.2s;
+  line-height: 1;
+}
+
+.remove-file-button:hover:not(:disabled) {
+  color: #d32f2f;
+}
+
+.remove-file-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .send-button {

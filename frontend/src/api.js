@@ -49,15 +49,18 @@ export const api = {
   /**
    * Send a message in a conversation.
    */
-  async sendMessage(conversationId, content) {
+  async sendMessage(conversationId, content, file = null) {
+    const formData = new FormData();
+    formData.append('content', content);
+    if (file) {
+      formData.append('file', file);
+    }
+
     const response = await fetch(
       `${API_BASE}/api/conversations/${conversationId}/message`,
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ content }),
+        body: formData,
       }
     );
     if (!response.ok) {
@@ -70,18 +73,22 @@ export const api = {
    * Send a message and receive streaming updates.
    * @param {string} conversationId - The conversation ID
    * @param {string} content - The message content
+   * @param {File|null} file - Optional PDF file to upload
    * @param {function} onEvent - Callback function for each event: (eventType, data) => void
    * @returns {Promise<void>}
    */
-  async sendMessageStream(conversationId, content, onEvent) {
+  async sendMessageStream(conversationId, content, file, onEvent) {
+    const formData = new FormData();
+    formData.append('content', content);
+    if (file) {
+      formData.append('file', file);
+    }
+
     const response = await fetch(
       `${API_BASE}/api/conversations/${conversationId}/message/stream`,
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ content }),
+        body: formData,
       }
     );
 

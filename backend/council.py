@@ -5,18 +5,16 @@ from .openrouter import query_models_parallel, query_model
 from .config import COUNCIL_MODELS, CHAIRMAN_MODEL
 
 
-async def stage1_collect_responses(user_query: str) -> List[Dict[str, Any]]:
+async def stage1_collect_responses(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Stage 1: Collect individual responses from all council models.
 
     Args:
-        user_query: The user's question
+        messages: List of message dicts (can include multimodal content with PDFs)
 
     Returns:
         List of dicts with 'model' and 'response' keys
     """
-    messages = [{"role": "user", "content": user_query}]
-
     # Query all models in parallel
     responses = await query_models_parallel(COUNCIL_MODELS, messages)
 
@@ -255,17 +253,19 @@ def calculate_aggregate_rankings(
     return aggregate
 
 
-async def generate_conversation_title(user_query: str) -> str:
+async def generate_conversation_title(user_query: str, has_pdf: bool = False) -> str:
     """
     Generate a short title for a conversation based on the first user message.
 
     Args:
-        user_query: The first user message
+        user_query: The first user message text
+        has_pdf: Whether a PDF was attached
 
     Returns:
         A short title (3-5 words)
     """
-    title_prompt = f"""Generate a very short title (3-5 words maximum) that summarizes the following question.
+    pdf_context = " (with PDF)" if has_pdf else ""
+    title_prompt = f"""Generate a very short title (3-5 words maximum) that summarizes the following question{pdf_context}.
 The title should be concise and descriptive. Do not use quotes or punctuation in the title.
 
 Question: {user_query}
@@ -293,18 +293,30 @@ Title:"""
     return title
 
 
-async def run_full_council(user_query: str) -> Tuple[List, List, Dict, Dict]:
+async def run_full_council(messages: List[Dict[str, Any]]) -> Tuple[List, List, Dict, Dict]:
     """
     Run the complete 3-stage council process.
 
     Args:
-        user_query: The user's question
+        messages: List of message dicts (can include multimodal content with PDFs)
 
     Returns:
         Tuple of (stage1_results, stage2_results, stage3_result, metadata)
     """
+    # Extract user query text for stage 2 and 3 context
+    # If messages contain multimodal content, extract just the text part
+    user_query = ""
+    if messages and len(messages) > 0:
+        content = messages[0].get('content', '')
+        if isinstance(content, str):
+            user_query = content
+        elif isinstance(content, list):
+            # Multimodal content - extract text parts
+            text_parts = [part.get('text', '') for part in content if part.get('type') == 'text']
+            user_query = ' '.join(text_parts)
+    
     # Stage 1: Collect individual responses
-    stage1_results = await stage1_collect_responses(user_query)
+    stage1_results = await stage1_collect_responses(messages)
 
     # If no models responded successfully, return error
     if not stage1_results:
@@ -313,13 +325,13 @@ async def run_full_council(user_query: str) -> Tuple[List, List, Dict, Dict]:
             "response": "All models failed to respond. Please try again."
         }, {}
 
-    # Stage 2: Collect rankings
+    # Stage 2: Collect rankings (using text query for context)
     stage2_results, label_to_model = await stage2_collect_rankings(user_query, stage1_results)
 
     # Calculate aggregate rankings
     aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
 
-    # Stage 3: Synthesize final answer
+    # Stage 3: Synthesize final answer (using text query for context)
     stage3_result = await stage3_synthesize_final(
         user_query,
         stage1_results,
