@@ -15,7 +15,7 @@ async def query_model(
 
     Args:
         model: OpenRouter model identifier (e.g., "openai/gpt-4o")
-        messages: List of message dicts with 'role' and 'content'
+        messages: List of message dicts with 'role' and 'content' (and optional 'attachments')
         timeout: Request timeout in seconds
 
     Returns:
@@ -26,9 +26,51 @@ async def query_model(
         "Content-Type": "application/json",
     }
 
+    # Process messages to handle attachments (multimodal)
+    processed_messages = []
+    for msg in messages:
+        new_msg = {"role": msg["role"]}
+        attachments = msg.get("attachments", [])
+        
+        if not attachments:
+            new_msg["content"] = msg["content"]
+        else:
+            # Multimodal content
+            content_parts = []
+            
+            # Add text part
+            if msg["content"]:
+                content_parts.append({
+                    "type": "text",
+                    "text": msg["content"]
+                })
+            
+            # Add attachment parts
+            for attachment in attachments:
+                # Expecting attachment to have 'type' (mime type) and 'base64' (data)
+                mime_type = attachment.get("type", "application/pdf")
+                base64_data = attachment.get("base64", "")
+                
+                # OpenRouter (and many providers) handle PDFs via image_url with data URI
+                # or specialized 'image_url' object.
+                # For PDF specifically, many providers on OpenRouter support it via standard image_url
+                # with the correct mime type in the data URI.
+                data_uri = f"data:{mime_type};base64,{base64_data}"
+                
+                content_parts.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": data_uri
+                    }
+                })
+            
+            new_msg["content"] = content_parts
+            
+        processed_messages.append(new_msg)
+
     payload = {
         "model": model,
-        "messages": messages,
+        "messages": processed_messages,
     }
 
     try:
@@ -38,9 +80,17 @@ async def query_model(
                 headers=headers,
                 json=payload
             )
+            
+            if response.status_code != 200:
+                print(f"Error response from OpenRouter: {response.text}")
+                
             response.raise_for_status()
 
             data = response.json()
+            if 'choices' not in data or not data['choices']:
+                print(f"No choices in response: {data}")
+                return None
+                
             message = data['choices'][0]['message']
 
             return {

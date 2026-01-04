@@ -161,3 +161,91 @@
   background: #ccc;
   border-color: #ccc;
 }
+
+/* Attachments */
+.input-area-container {
+  border-top: 1px solid #e0e0e0;
+  background: #fafafa;
+  display: flex;
+  flex-direction: column;
+}
+
+.attachments-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 24px 0 24px;
+}
+
+.attachment-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #333;
+}
+
+.attachment-icon {
+  width: 16px;
+  height: 16px;
+  color: #666;
+}
+
+.attachment-name {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-remove {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: #999;
+  display: flex;
+  align-items: center;
+}
+
+.attachment-remove:hover {
+  color: #d32f2f;
+}
+
+/* Updated Input Form */
+.input-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 12px 24px 24px 24px;
+  border-top: none; /* Moved to container */
+  background: transparent;
+}
+
+.attach-button {
+  padding: 14px;
+  background: #f0f0f0;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2px; /* Align with textarea bottom */
+}
+
+.attach-button:hover:not(:disabled) {
+  background: #e0e0e0;
+  color: #333;
+}
+
+.attach-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

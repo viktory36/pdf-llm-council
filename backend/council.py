@@ -5,17 +5,21 @@ from .openrouter import query_models_parallel, query_model
 from .config import COUNCIL_MODELS, CHAIRMAN_MODEL
 
 
-async def stage1_collect_responses(user_query: str) -> List[Dict[str, Any]]:
+async def stage1_collect_responses(
+    user_query: str,
+    attachments: List[Dict[str, Any]] = []
+) -> List[Dict[str, Any]]:
     """
     Stage 1: Collect individual responses from all council models.
 
     Args:
         user_query: The user's question
+        attachments: List of attachments (PDFs etc)
 
     Returns:
         List of dicts with 'model' and 'response' keys
     """
-    messages = [{"role": "user", "content": user_query}]
+    messages = [{"role": "user", "content": user_query, "attachments": attachments}]
 
     # Query all models in parallel
     responses = await query_models_parallel(COUNCIL_MODELS, messages)
@@ -115,7 +119,8 @@ Now provide your evaluation and ranking:"""
 async def stage3_synthesize_final(
     user_query: str,
     stage1_results: List[Dict[str, Any]],
-    stage2_results: List[Dict[str, Any]]
+    stage2_results: List[Dict[str, Any]],
+    attachments: List[Dict[str, Any]] = []
 ) -> Dict[str, Any]:
     """
     Stage 3: Chairman synthesizes final response.
@@ -156,7 +161,7 @@ Your task as Chairman is to synthesize all of this information into a single, co
 
 Provide a clear, well-reasoned final answer that represents the council's collective wisdom:"""
 
-    messages = [{"role": "user", "content": chairman_prompt}]
+    messages = [{"role": "user", "content": chairman_prompt, "attachments": attachments}]
 
     # Query the chairman model
     response = await query_model(CHAIRMAN_MODEL, messages)
@@ -293,18 +298,22 @@ Title:"""
     return title
 
 
-async def run_full_council(user_query: str) -> Tuple[List, List, Dict, Dict]:
+async def run_full_council(
+    user_query: str,
+    attachments: List[Dict[str, Any]] = []
+) -> Tuple[List, List, Dict, Dict]:
     """
     Run the complete 3-stage council process.
 
     Args:
         user_query: The user's question
+        attachments: List of attachments
 
     Returns:
         Tuple of (stage1_results, stage2_results, stage3_result, metadata)
     """
     # Stage 1: Collect individual responses
-    stage1_results = await stage1_collect_responses(user_query)
+    stage1_results = await stage1_collect_responses(user_query, attachments)
 
     # If no models responded successfully, return error
     if not stage1_results:
@@ -323,7 +332,8 @@ async def run_full_council(user_query: str) -> Tuple[List, List, Dict, Dict]:
     stage3_result = await stage3_synthesize_final(
         user_query,
         stage1_results,
-        stage2_results
+        stage2_results,
+        attachments
     )
 
     # Prepare metadata
