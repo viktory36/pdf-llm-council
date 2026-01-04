@@ -1,16 +1,17 @@
 """FastAPI backend for LLM Council."""
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import uuid
 import json
 import asyncio
 
 from . import storage
 from .council import run_full_council, generate_conversation_title, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings
+from .pdf_processor import create_message_with_pdf
 
 app = FastAPI(title="LLM Council API")
 
@@ -80,9 +81,14 @@ async def get_conversation(conversation_id: str):
 
 
 @app.post("/api/conversations/{conversation_id}/message")
-async def send_message(conversation_id: str, request: SendMessageRequest):
+async def send_message(
+    conversation_id: str,
+    content: str = Form(...),
+    file: Optional[UploadFile] = File(None)
+):
     """
     Send a message and run the 3-stage council process.
+    Supports optional PDF file upload using OpenRouter's native PDF support.
     Returns the complete response with all stages.
     """
     # Check if conversation exists
@@ -93,18 +99,38 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
     # Check if this is the first message
     is_first_message = len(conversation["messages"]) == 0
 
-    # Add user message
-    storage.add_user_message(conversation_id, request.content)
+    # Prepare messages for OpenRouter API
+    messages = []
+    if file is not None:
+        # Validate file type
+        if not file.filename.lower().endswith('.pdf'):
+            raise HTTPException(status_code=400, detail="Only PDF files are supported")
+        
+        try:
+            # Read file content
+            pdf_bytes = await file.read()
+            
+            # Create multimodal message with PDF using OpenRouter's native support
+            messages = create_message_with_pdf(content, pdf_bytes, file.filename)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"PDF processing error: {str(e)}")
+    else:
+        # Regular text-only message
+        messages = [{"role": "user", "content": content}]
+
+    # Add user message to storage (store original content + indication of PDF if attached)
+    storage_content = content
+    if file is not None:
+        storage_content = f"{content}\n\n[PDF attached: {file.filename}]"
+    storage.add_user_message(conversation_id, storage_content)
 
     # If this is the first message, generate a title
     if is_first_message:
-        title = await generate_conversation_title(request.content)
+        title = await generate_conversation_title(content, has_pdf=(file is not None))
         storage.update_conversation_title(conversation_id, title)
 
-    # Run the 3-stage council process
-    stage1_results, stage2_results, stage3_result, metadata = await run_full_council(
-        request.content
-    )
+    # Run the 3-stage council process with messages (including PDF if present)
+    stage1_results, stage2_results, stage3_result, metadata = await run_full_council(messages)
 
     # Add assistant message with all stages
     storage.add_assistant_message(
@@ -124,9 +150,14 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
 
 
 @app.post("/api/conversations/{conversation_id}/message/stream")
-async def send_message_stream(conversation_id: str, request: SendMessageRequest):
+async def send_message_stream(
+    conversation_id: str,
+    content: str = Form(...),
+    file: Optional[UploadFile] = File(None)
+):
     """
     Send a message and stream the 3-stage council process.
+    Supports optional PDF file upload using OpenRouter's native PDF support.
     Returns Server-Sent Events as each stage completes.
     """
     # Check if conversation exists
@@ -137,30 +168,57 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
     # Check if this is the first message
     is_first_message = len(conversation["messages"]) == 0
 
+    # Prepare messages for OpenRouter API
+    messages = []
+    pdf_filename = None
+    if file is not None:
+        # Validate file type
+        if not file.filename.lower().endswith('.pdf'):
+            raise HTTPException(status_code=400, detail="Only PDF files are supported")
+        
+        pdf_filename = file.filename
+        try:
+            # Read file content
+            pdf_bytes = await file.read()
+            
+            # Create multimodal message with PDF using OpenRouter's native support
+            messages = create_message_with_pdf(content, pdf_bytes, file.filename)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"PDF processing error: {str(e)}")
+    else:
+        # Regular text-only message
+        messages = [{"role": "user", "content": content}]
+
     async def event_generator():
         try:
-            # Add user message
-            storage.add_user_message(conversation_id, request.content)
+            # Add user message (store original content + indication of PDF if attached)
+            storage_content = content
+            if pdf_filename is not None:
+                storage_content = f"{content}\n\n[PDF attached: {pdf_filename}]"
+            storage.add_user_message(conversation_id, storage_content)
 
             # Start title generation in parallel (don't await yet)
             title_task = None
             if is_first_message:
-                title_task = asyncio.create_task(generate_conversation_title(request.content))
+                title_task = asyncio.create_task(generate_conversation_title(content, has_pdf=(pdf_filename is not None)))
 
-            # Stage 1: Collect responses
+            # Stage 1: Collect responses (using messages with PDF if present)
             yield f"data: {json.dumps({'type': 'stage1_start'})}\n\n"
-            stage1_results = await stage1_collect_responses(request.content)
+            stage1_results = await stage1_collect_responses(messages)
             yield f"data: {json.dumps({'type': 'stage1_complete', 'data': stage1_results})}\n\n"
+
+            # Extract text query for stages 2 and 3
+            user_query = content
 
             # Stage 2: Collect rankings
             yield f"data: {json.dumps({'type': 'stage2_start'})}\n\n"
-            stage2_results, label_to_model = await stage2_collect_rankings(request.content, stage1_results)
+            stage2_results, label_to_model = await stage2_collect_rankings(user_query, stage1_results)
             aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
             yield f"data: {json.dumps({'type': 'stage2_complete', 'data': stage2_results, 'metadata': {'label_to_model': label_to_model, 'aggregate_rankings': aggregate_rankings}})}\n\n"
 
             # Stage 3: Synthesize final answer
             yield f"data: {json.dumps({'type': 'stage3_start'})}\n\n"
-            stage3_result = await stage3_synthesize_final(request.content, stage1_results, stage2_results)
+            stage3_result = await stage3_synthesize_final(user_query, stage1_results, stage2_results)
             yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
 
             # Wait for title generation if it was started

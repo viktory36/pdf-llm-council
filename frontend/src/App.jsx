@@ -57,13 +57,17 @@ function App() {
     setCurrentConversationId(id);
   };
 
-  const handleSendMessage = async (content) => {
+  const handleSendMessage = async (content, file = null) => {
     if (!currentConversationId) return;
 
     setIsLoading(true);
     try {
       // Optimistically add user message to UI
-      const userMessage = { role: 'user', content };
+      let userMessageContent = content;
+      if (file) {
+        userMessageContent = `${content}\n\n[PDF attached: ${file.name}]`;
+      }
+      const userMessage = { role: 'user', content: userMessageContent };
       setCurrentConversation((prev) => ({
         ...prev,
         messages: [...prev.messages, userMessage],
@@ -89,8 +93,8 @@ function App() {
         messages: [...prev.messages, assistantMessage],
       }));
 
-      // Send message with streaming
-      await api.sendMessageStream(currentConversationId, content, (eventType, event) => {
+      // Send message with streaming (passing file)
+      await api.sendMessageStream(currentConversationId, content, file, (eventType, event) => {
         switch (eventType) {
           case 'stage1_start':
             setCurrentConversation((prev) => {
